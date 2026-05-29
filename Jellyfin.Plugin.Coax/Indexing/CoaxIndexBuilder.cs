@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Jellyfin.Data.Entities;
 using Jellyfin.Data.Enums;
+using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.Coax.Models;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
@@ -126,8 +126,20 @@ public class CoaxIndexBuilder
             return null;
         }
 
-        // Higher level = more restrictive. Null means we couldn't map it → treat as no cap.
-        return _localization.GetRatingLevel(maxOfficialRating);
+        // Higher score = more restrictive. Null means we couldn't map it → treat as no cap.
+        return RatingScore(maxOfficialRating);
+    }
+
+    // Jellyfin 10.11 replaced GetRatingLevel(rating) with GetRatingScore(rating, country)
+    // returning a ParentalRatingScore. We compare on Score; null country uses the server default.
+    private int? RatingScore(string? rating)
+    {
+        if (string.IsNullOrWhiteSpace(rating))
+        {
+            return null;
+        }
+
+        return _localization.GetRatingScore(rating, null!)?.Score;
     }
 
     private static IReadOnlyList<BaseItemKind> ResolveItemKinds(IReadOnlyList<string> itemTypes)
@@ -168,7 +180,7 @@ public class CoaxIndexBuilder
             return true;
         }
 
-        var level = _localization.GetRatingLevel(rating);
+        var level = RatingScore(rating);
         // Unknown rating string → can't compare → include.
         return level is null || level.Value <= ratingCap.Value;
     }

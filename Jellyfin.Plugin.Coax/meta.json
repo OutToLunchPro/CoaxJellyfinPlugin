@@ -5,7 +5,7 @@
     "description": "Stateless person→items inverse and collection-membership index for Coax Actor/Director channels (movies and TV).",
     "owner": "coax",
     "overview": "Exposes /coax/info and /coax/index so the Coax client can build Actor/Director channels for Jellyfin libraries.",
-    "targetAbi": "10.10.0.0",
-    "framework": "net8.0",
+    "targetAbi": "10.11.0.0",
+    "framework": "net9.0",
     "version": "1.0.0.0"
 }
