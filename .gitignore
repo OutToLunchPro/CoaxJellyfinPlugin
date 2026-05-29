@@ -1,0 +1,13 @@
+# Build output (also contains absolute local paths under obj/)
+bin/
+obj/
+
+# Local Claude settings (contains local filesystem paths)
+.claude/
+
+# macOS
+.DS_Store
+
+# Internal design docs — not for the public repo
+coax-jf-plugin-build-prompt.md
+coax-jf-plugin-contract.md
