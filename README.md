@@ -1,12 +1,9 @@
 # Jellyfin.Plugin.Coax
 
 A minimal, **stateless** Jellyfin plugin that exposes the person→items inverse that vanilla
-Jellyfin can't produce cheaply, so the Coax client can build **Actor / Director channels** for
-both movie and TV libraries.
+Jellyfin can't produce cheaply, so the [https://coaxtheapp.com](Coax) client can build **Actor / Director channels** for both movie and TV libraries.
 
-The plugin stores nothing and knows nothing about channels or scheduling. It runs the DB
-joins vanilla can't and returns raw associations plus item metadata; all scheduling stays on
-the client.
+The plugin stores nothing and knows nothing about channels or scheduling. It runs the DB joins vanilla can't and returns raw associations plus item metadata; all scheduling stays on the client.
 
 ## Endpoints
 
@@ -21,8 +18,7 @@ Capability probe (standard Jellyfin auth).
 
 ### `POST /coax/index`
 
-The data call (`Authorization: MediaBrowser Token=…`). Request shapes data only — never
-scheduling. See the contract for the full request/response shape.
+The data call (`Authorization: MediaBrowser Token=…`). Request shapes data only — never scheduling. See the contract for the full request/response shape.
 
 ```jsonc
 {
@@ -35,17 +31,11 @@ scheduling. See the contract for the full request/response shape.
 }
 ```
 
-The response carries the full filtered library inline (`items`) and the person→item-id inverse
-(`people`, the reason the plugin exists). `itemIds` always point at schedulable items (Movie or
-Episode ids), never Series ids. Collection memberships are intentionally **not** returned — the
-Coax client already prefetches box sets cheaply on its own.
+The response carries the full filtered library inline (`items`) and the person→item-id inverse (`people`, the reason the plugin exists). `itemIds` always point at schedulable items (Movie or Episode ids), never Series ids. Collection memberships are intentionally **not** returned — the Coax client already prefetches box sets cheaply on its own.
 
 #### TV semantics
 
-Cast attaches at two levels and the actor inverse unions both: **series-level** main/recurring
-cast (applied to all returned episodes of that series) ∪ **episode-level** guest stars
-(applied to just that episode). `GuestStar` folds into `Actor`. **Directors** are read
-per-episode and never inherited from the series.
+Cast attaches at two levels and the actor inverse unions both: **series-level** main/recurring cast (applied to all returned episodes of that series) ∪ **episode-level** guest stars (applied to just that episode). `GuestStar` folds into `Actor`. **Directors** are read per-episode and never inherited from the series.
 
 ## Build
 
@@ -55,11 +45,9 @@ Targets **net9.0** against the Jellyfin 10.11 ABI (built with the .NET 9 or 10 S
 ./build.sh
 ```
 
-`build.sh` compiles in Release and refreshes the drop-in bundle at `dist/Coax_1.0.0.0/`
-(`Jellyfin.Plugin.Coax.dll` + `meta.json`). Drop that folder into the `plugins/` directory under
-your Jellyfin data directory and restart the server.
+`build.sh` compiles in Release and refreshes the drop-in bundle at `dist/Coax_1.0.0.0/` (`Jellyfin.Plugin.Coax.dll` + `meta.json`). Drop that folder into the `plugins/` directory under your Jellyfin data directory and restart the server.
 
 ## Scope (v1)
 
-In: the stateless `/coax/info` + `/coax/index` data endpoints for Movies and Episodes.
-Out: schedule generation, lineup storage, WebSocket events, Live TV, transcoding, Emby.
+* In: the stateless `/coax/info` + `/coax/index` data endpoints for Movies and Episodes.
+* Out: schedule generation, lineup storage, WebSocket events, Live TV, transcoding, Emby.  
