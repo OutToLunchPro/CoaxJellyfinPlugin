@@ -15,7 +15,7 @@ namespace Jellyfin.Plugin.Coax.Api;
 /// Coax data endpoints: a capability probe and the stateless person/collection index.
 /// </summary>
 [ApiController]
-[Authorize(Policy = "DefaultAuthorization")]
+[Authorize]
 [Route("coax")]
 [Produces(MediaTypeNames.Application.Json)]
 public class CoaxController : ControllerBase
