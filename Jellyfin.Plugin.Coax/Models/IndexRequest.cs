@@ -21,9 +21,9 @@ public class IndexRequest
     [JsonPropertyName("itemTypes")]
     public IReadOnlyList<string> ItemTypes { get; set; } = new[] { "Movie", "Episode" };
 
-    /// <summary>Gets or sets which sections to include (<c>items</c>, <c>people</c>, <c>collections</c>).</summary>
+    /// <summary>Gets or sets which sections to include (<c>items</c>, <c>people</c>).</summary>
     [JsonPropertyName("include")]
-    public IReadOnlyList<string> Include { get; set; } = new[] { "items", "people", "collections" };
+    public IReadOnlyList<string> Include { get; set; } = new[] { "items", "people" };
 
     /// <summary>Gets or sets the server-evaluated filters.</summary>
     [JsonPropertyName("filters")]

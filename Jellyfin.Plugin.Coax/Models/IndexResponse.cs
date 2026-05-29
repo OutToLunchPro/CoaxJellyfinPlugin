@@ -23,10 +23,6 @@ public class IndexResponse
     /// <summary>Gets or sets the person→items inverse (the reason this plugin exists).</summary>
     [JsonPropertyName("people")]
     public IReadOnlyList<PersonDto> People { get; set; } = new List<PersonDto>();
-
-    /// <summary>Gets or sets collection memberships intersected with the returned items.</summary>
-    [JsonPropertyName("collections")]
-    public IReadOnlyList<CollectionDto> Collections { get; set; } = new List<CollectionDto>();
 }
 
 /// <summary>
@@ -122,20 +118,6 @@ public class PersonDto
     public string Type { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the associated item ids.</summary>
-    [JsonPropertyName("itemIds")]
-    public IReadOnlyList<string> ItemIds { get; set; } = System.Array.Empty<string>();
-}
-
-/// <summary>
-/// A collection (BoxSet) and its members intersected with the returned items.
-/// </summary>
-public class CollectionDto
-{
-    /// <summary>Gets or sets the collection name.</summary>
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = string.Empty;
-
-    /// <summary>Gets or sets the member item ids present in the returned set.</summary>
     [JsonPropertyName("itemIds")]
     public IReadOnlyList<string> ItemIds { get; set; } = System.Array.Empty<string>();
 }

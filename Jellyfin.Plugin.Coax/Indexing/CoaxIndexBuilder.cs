@@ -57,7 +57,6 @@ public class CoaxIndexBuilder
 
         var includeItems = request.Include.Contains("items", StringComparer.OrdinalIgnoreCase);
         var includePeople = request.Include.Contains("people", StringComparer.OrdinalIgnoreCase);
-        var includeCollections = request.Include.Contains("collections", StringComparer.OrdinalIgnoreCase);
 
         var (isPlayed, user) = ResolveWatched(filters);
         var ratingCap = ResolveRatingCap(filters.MaxOfficialRating);
@@ -83,11 +82,6 @@ public class CoaxIndexBuilder
         if (includePeople)
         {
             response.People = BuildPeople(shaped, includedIds, Math.Max(1, shaping.MinItemsPerPerson));
-        }
-
-        if (includeCollections)
-        {
-            response.Collections = BuildCollections(includedIds, user);
         }
 
         return response;
@@ -484,44 +478,4 @@ public class CoaxIndexBuilder
     }
 
     private static string NormalizeName(string? name) => (name ?? string.Empty).Trim();
-
-    // ---- Collections -------------------------------------------------------------------
-
-    private IReadOnlyList<CollectionDto> BuildCollections(HashSet<Guid> includedIds, User? user)
-    {
-        var boxSets = _libraryManager.GetItemList(new InternalItemsQuery(user)
-        {
-            IncludeItemTypes = new[] { BaseItemKind.BoxSet },
-            Recursive = true,
-            EnableTotalRecordCount = false
-        });
-
-        var collections = new List<CollectionDto>();
-
-        foreach (var boxSet in boxSets)
-        {
-            var members = _libraryManager.GetItemList(new InternalItemsQuery(user)
-            {
-                ParentId = boxSet.Id,
-                Recursive = true,
-                EnableTotalRecordCount = false
-            });
-
-            var memberIds = members
-                .Where(m => includedIds.Contains(m.Id))
-                .Select(m => m.Id.ToString("N"))
-                .ToList();
-
-            if (memberIds.Count > 0)
-            {
-                collections.Add(new CollectionDto
-                {
-                    Name = boxSet.Name ?? string.Empty,
-                    ItemIds = memberIds
-                });
-            }
-        }
-
-        return collections;
-    }
 }

@@ -15,7 +15,6 @@ public static class CoaxContract
     {
         "index.people",
         "index.studios",
-        "index.collections",
         "index.items"
     };
 }

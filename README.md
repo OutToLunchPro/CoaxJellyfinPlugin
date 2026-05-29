@@ -1,8 +1,8 @@
 # Jellyfin.Plugin.Coax
 
-A minimal, **stateless** Jellyfin plugin that exposes the person→items inverse (and
-collection memberships) that vanilla Jellyfin can't produce cheaply, so the Coax client can
-build **Actor / Director channels** for both movie and TV libraries.
+A minimal, **stateless** Jellyfin plugin that exposes the person→items inverse that vanilla
+Jellyfin can't produce cheaply, so the Coax client can build **Actor / Director channels** for
+both movie and TV libraries.
 
 The plugin stores nothing and knows nothing about channels or scheduling. It runs the DB
 joins vanilla can't and returns raw associations plus item metadata; all scheduling stays on
@@ -16,7 +16,7 @@ Capability probe (standard Jellyfin auth).
 
 ```json
 { "pluginVersion": "1.0.0", "contractVersion": 1,
-  "capabilities": ["index.people", "index.studios", "index.collections", "index.items"] }
+  "capabilities": ["index.people", "index.studios", "index.items"] }
 ```
 
 ### `POST /coax/index`
@@ -29,15 +29,16 @@ scheduling. See the contract for the full request/response shape.
   "contractVersion": 1,
   "libraryIds": ["<jf library id>"],
   "itemTypes": ["Movie", "Episode"],
-  "include": ["items", "people", "collections"],
+  "include": ["items", "people"],
   "filters": { "maxOfficialRating": "PG-13", "watched": "all", "userId": null },
   "shaping": { "minItemsPerPerson": 5, "maxItems": 20000, "maxEpisodesPerSeries": 50 }
 }
 ```
 
-The response carries the full filtered library inline (`items`), the person→item-id inverse
-(`people`, the reason the plugin exists), and collection memberships (`collections`).
-`itemIds` always point at schedulable items (Movie or Episode ids), never Series ids.
+The response carries the full filtered library inline (`items`) and the person→item-id inverse
+(`people`, the reason the plugin exists). `itemIds` always point at schedulable items (Movie or
+Episode ids), never Series ids. Collection memberships are intentionally **not** returned — the
+Coax client already prefetches box sets cheaply on its own.
 
 #### TV semantics
 
@@ -48,15 +49,15 @@ per-episode and never inherited from the series.
 
 ## Build
 
-Requires the **.NET 8 SDK**. Targets the Jellyfin 10.10 ABI.
+Targets **net9.0** against the Jellyfin 10.11 ABI (built with the .NET 9 or 10 SDK).
 
 ```sh
-dotnet build -c Release
+./build.sh
 ```
 
-The plugin assembly is emitted to `Jellyfin.Plugin.Coax/bin/Release/net8.0/Jellyfin.Plugin.Coax.dll`.
-Drop it (with `meta.json`) into a `plugins/Coax/` folder under your Jellyfin data directory and
-restart the server.
+`build.sh` compiles in Release and refreshes the drop-in bundle at `dist/Coax_1.0.0.0/`
+(`Jellyfin.Plugin.Coax.dll` + `meta.json`). Drop that folder into the `plugins/` directory under
+your Jellyfin data directory and restart the server.
 
 ## Scope (v1)
 
