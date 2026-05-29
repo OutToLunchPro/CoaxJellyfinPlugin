@@ -47,6 +47,25 @@ Targets **net9.0** against the Jellyfin 10.11 ABI (built with the .NET 9 or 10 S
 
 `build.sh` compiles in Release and refreshes the drop-in bundle at `dist/Coax_1.0.0.0/` (`Jellyfin.Plugin.Coax.dll` + `meta.json`). Drop that folder into the `plugins/` directory under your Jellyfin data directory and restart the server.
 
+It also emits `dist/Coax_<version>.zip` and `dist/manifest.json` for installing via a
+repository instead of side-loading (see below).
+
+## Install via a repository (optional)
+
+Side-loaded plugins show *"An error occurred while getting the plugin details from the
+repository"* on their dashboard page — cosmetic, because the GUID isn't in any repo Jellyfin
+knows. To resolve it (and get in-app updates):
+
+```sh
+COAX_SOURCE_BASE_URL=https://my.host/jellyfin ./build.sh
+```
+
+`sourceUrl` in `manifest.json` is built as `$COAX_SOURCE_BASE_URL/Coax_<version>.zip`
+(defaults to a `CHANGE_ME` placeholder if unset). Host `dist/Coax_<version>.zip` and
+`dist/manifest.json` at that base URL, then add the `manifest.json` URL under
+**Dashboard → Plugins → Repositories**. The `checksum` is the zip's MD5 and must match, or
+installs fail.
+
 ## Scope (v1)
 
 * In: the stateless `/coax/info` + `/coax/index` data endpoints for Movies and Episodes.
