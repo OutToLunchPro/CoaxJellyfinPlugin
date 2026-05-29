@@ -1,6 +1,7 @@
 # Build output (also contains absolute local paths under obj/)
 bin/
 obj/
+dist/
 
 # Local Claude settings (contains local filesystem paths)
 .claude/
