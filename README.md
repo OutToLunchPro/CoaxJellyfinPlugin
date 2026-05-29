@@ -1,7 +1,7 @@
 # Jellyfin.Plugin.Coax
 
 A minimal, **stateless** Jellyfin plugin that exposes the person→items inverse that vanilla
-Jellyfin can't produce cheaply, so the [https://coaxtheapp.com](Coax) client can build **Actor / Director channels** for both movie and TV libraries.
+Jellyfin can't produce cheaply, so the [Coax](https://coaxtheapp.com) client can build **Actor / Director channels** for both movie and TV libraries.
 
 The plugin stores nothing and knows nothing about channels or scheduling. It runs the DB joins vanilla can't and returns raw associations plus item metadata; all scheduling stays on the client.
 
