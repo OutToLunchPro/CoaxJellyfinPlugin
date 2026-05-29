@@ -1,10 +1,12 @@
 using System;
 using System.Net.Mime;
+using Jellyfin.Database.Implementations;
 using Jellyfin.Plugin.Coax.Indexing;
 using Jellyfin.Plugin.Coax.Models;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Globalization;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -23,6 +25,7 @@ public class CoaxController : ControllerBase
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
     private readonly ILocalizationManager _localization;
+    private readonly IDbContextFactory<JellyfinDbContext> _dbFactory;
     private readonly ILogger<CoaxController> _logger;
 
     /// <summary>
@@ -31,16 +34,19 @@ public class CoaxController : ControllerBase
     /// <param name="libraryManager">The library manager.</param>
     /// <param name="userManager">The user manager.</param>
     /// <param name="localization">The localization manager (for content-rating levels).</param>
+    /// <param name="dbFactory">Factory for the Jellyfin database context (for the people join).</param>
     /// <param name="logger">The logger.</param>
     public CoaxController(
         ILibraryManager libraryManager,
         IUserManager userManager,
         ILocalizationManager localization,
+        IDbContextFactory<JellyfinDbContext> dbFactory,
         ILogger<CoaxController> logger)
     {
         _libraryManager = libraryManager;
         _userManager = userManager;
         _localization = localization;
+        _dbFactory = dbFactory;
         _logger = logger;
     }
 
@@ -87,7 +93,7 @@ public class CoaxController : ControllerBase
 
         try
         {
-            var builder = new CoaxIndexBuilder(_libraryManager, _userManager, _localization, _logger);
+            var builder = new CoaxIndexBuilder(_libraryManager, _userManager, _localization, _dbFactory, _logger);
             return builder.Build(request);
         }
         catch (ArgumentException ex)

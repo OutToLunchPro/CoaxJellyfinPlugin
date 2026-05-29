@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Jellyfin.Data.Enums;
+using Jellyfin.Database.Implementations;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.Coax.Models;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Globalization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Coax.Indexing;
@@ -23,6 +25,7 @@ public class CoaxIndexBuilder
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
     private readonly ILocalizationManager _localization;
+    private readonly IDbContextFactory<JellyfinDbContext> _dbFactory;
     private readonly ILogger _logger;
 
     /// <summary>
@@ -32,11 +35,13 @@ public class CoaxIndexBuilder
         ILibraryManager libraryManager,
         IUserManager userManager,
         ILocalizationManager localization,
+        IDbContextFactory<JellyfinDbContext> dbFactory,
         ILogger logger)
     {
         _libraryManager = libraryManager;
         _userManager = userManager;
         _localization = localization;
+        _dbFactory = dbFactory;
         _logger = logger;
     }
 
@@ -351,20 +356,20 @@ public class CoaxIndexBuilder
 
     // ---- People (the whole reason this plugin exists) ----------------------------------
 
+    /// <summary>
+    /// Builds the person→items inverse with a single chunked join over the PeopleBaseItemMap
+    /// table — the query vanilla can't do cheaply — instead of an N+1 GetPeople per item.
+    /// </summary>
     private IReadOnlyList<PersonDto> BuildPeople(
         List<BaseItem> items,
         HashSet<Guid> includedIds,
         int minItemsPerPerson)
     {
-        // (name, role) → distinct schedulable item ids.
-        var buckets = new Dictionary<(string Name, string Role), HashSet<Guid>>();
+        // For TV: map each series to its returned episode ids so series-level cast can be
+        // expanded onto every returned episode of that series.
         var episodesBySeries = new Dictionary<Guid, List<Guid>>();
-
-        // Pass 1 — item-level cast/crew for every movie and episode.
         foreach (var item in items)
         {
-            CreditItemPeople(item, item.Id, buckets);
-
             if (item is Episode ep && ep.SeriesId != Guid.Empty)
             {
                 if (!episodesBySeries.TryGetValue(ep.SeriesId, out var list))
@@ -377,23 +382,34 @@ public class CoaxIndexBuilder
             }
         }
 
-        // Pass 2 — series-level cast (main/recurring actors) → all included episodes of that series.
-        foreach (var (seriesId, episodeIds) in episodesBySeries)
+        // One map covering the schedulable items themselves plus their parent series.
+        var lookupIds = new HashSet<Guid>(includedIds);
+        foreach (var seriesId in episodesBySeries.Keys)
         {
-            if (_libraryManager.GetItemById(seriesId) is not BaseItem series)
+            lookupIds.Add(seriesId);
+        }
+
+        var buckets = new Dictionary<(string Name, string Role), HashSet<Guid>>();
+
+        foreach (var row in QueryPeopleMap(lookupIds))
+        {
+            var role = NormalizeRole(row.PersonType);
+            if (role is null)
             {
                 continue;
             }
 
-            foreach (var person in _libraryManager.GetPeople(series))
-            {
-                // Series-level: actors/guest stars only. Directors are credited per-episode.
-                if (!IsActor(person.Type))
-                {
-                    continue;
-                }
+            var key = (NormalizeName(row.Name), role);
 
-                var key = (NormalizeName(person.Name), "Actor");
+            if (includedIds.Contains(row.ItemId))
+            {
+                // Item-level credit: movie, or an episode's own cast / guest star / director.
+                AddToBucket(buckets, key, new[] { row.ItemId });
+            }
+            else if (role == "Actor" && episodesBySeries.TryGetValue(row.ItemId, out var episodeIds))
+            {
+                // Series-level cast → all returned episodes of that series.
+                // Directors are never inherited from the series (episode-level only).
                 AddToBucket(buckets, key, episodeIds);
             }
         }
@@ -409,37 +425,45 @@ public class CoaxIndexBuilder
             .ToList();
     }
 
-    private void CreditItemPeople(
-        BaseItem item,
-        Guid itemId,
-        Dictionary<(string Name, string Role), HashSet<Guid>> buckets)
+    // Pull (ItemId, PersonName, PersonType) for the given items in chunks — a handful of
+    // queries instead of one per item, and staying under SQLite's bound-parameter limit.
+    private List<(Guid ItemId, string? Name, string? PersonType)> QueryPeopleMap(IReadOnlyCollection<Guid> ids)
     {
-        foreach (var person in _libraryManager.GetPeople(item))
+        var rows = new List<(Guid, string?, string?)>(ids.Count);
+        using var db = _dbFactory.CreateDbContext();
+
+        foreach (var chunk in ids.Chunk(500))
         {
-            string? role = null;
-            if (IsActor(person.Type))
-            {
-                role = "Actor";
-            }
-            else if (person.Type == PersonKind.Director)
-            {
-                role = "Director";
-            }
+            var batch = db.PeopleBaseItemMap
+                .Where(m => chunk.Contains(m.ItemId))
+                .Select(m => new { m.ItemId, m.People.Name, m.People.PersonType })
+                .ToList();
 
-            if (role is null)
+            foreach (var r in batch)
             {
-                continue;
+                rows.Add((r.ItemId, r.Name, r.PersonType));
             }
-
-            var key = (NormalizeName(person.Name), role);
-            if (!buckets.TryGetValue(key, out var ids))
-            {
-                ids = new HashSet<Guid>();
-                buckets[key] = ids;
-            }
-
-            ids.Add(itemId);
         }
+
+        return rows;
+    }
+
+    // Jellyfin stores PersonType as a string. GuestStar folds into Actor; everything other
+    // than Actor/Director is ignored for v1.
+    private static string? NormalizeRole(string? personType)
+    {
+        if (string.Equals(personType, "Actor", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(personType, "GuestStar", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Actor";
+        }
+
+        if (string.Equals(personType, "Director", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Director";
+        }
+
+        return null;
     }
 
     private static void AddToBucket(
@@ -458,9 +482,6 @@ public class CoaxIndexBuilder
             set.Add(id);
         }
     }
-
-    // GuestStar folds into Actor for our purposes.
-    private static bool IsActor(PersonKind kind) => kind == PersonKind.Actor || kind == PersonKind.GuestStar;
 
     private static string NormalizeName(string? name) => (name ?? string.Empty).Trim();
 
