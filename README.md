@@ -50,11 +50,28 @@ Targets **net9.0** against the Jellyfin 10.11 ABI (built with the .NET 9 or 10 S
 It also emits `dist/Coax_<version>.zip` and `dist/manifest.json` for installing via a
 repository instead of side-loading (see below).
 
-## Install via a repository (optional)
+## Install from the GitHub repository (recommended)
 
-Side-loaded plugins show *"An error occurred while getting the plugin details from the
-repository"* on their dashboard page — cosmetic, because the GUID isn't in any repo Jellyfin
-knows. To resolve it (and get in-app updates):
+The repo publishes a `manifest.json` at its root whose `sourceUrl` points at the plugin zip
+attached to the matching GitHub release. To install (and get in-app updates) without building
+or hosting anything yourself:
+
+1. In Jellyfin, go to **Dashboard → Plugins → Repositories → +**.
+2. Add a repository with any name and this URL:
+
+   ```
+   https://raw.githubusercontent.com/OutToLunchPro/CoaxJellyfinPlugin/main/manifest.json
+   ```
+
+3. Go to **Dashboard → Plugins → Catalog**, find **Coax** under *General*, and install it.
+4. Restart Jellyfin when prompted.
+
+This also clears the *"An error occurred while getting the plugin details from the
+repository"* message that side-loaded copies show, since the GUID now resolves to a known repo.
+
+## Install via your own repository (optional)
+
+If you'd rather self-host the manifest and zip, point the build at your base URL:
 
 ```sh
 COAX_SOURCE_BASE_URL=https://my.host/jellyfin ./build.sh
