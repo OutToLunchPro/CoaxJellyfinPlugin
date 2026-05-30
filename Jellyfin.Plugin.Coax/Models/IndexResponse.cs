@@ -18,11 +18,11 @@ public class IndexResponse
 
     /// <summary>Gets or sets the filtered schedulable items (movies and/or episodes).</summary>
     [JsonPropertyName("items")]
-    public IReadOnlyList<ItemDto> Items { get; set; } = new List<ItemDto>();
+    public IReadOnlyList<ItemDto> Items { get; set; } = System.Array.Empty<ItemDto>();
 
     /// <summary>Gets or sets the person→items inverse (the reason this plugin exists).</summary>
     [JsonPropertyName("people")]
-    public IReadOnlyList<PersonDto> People { get; set; } = new List<PersonDto>();
+    public IReadOnlyList<PersonDto> People { get; set; } = System.Array.Empty<PersonDto>();
 }
 
 /// <summary>
