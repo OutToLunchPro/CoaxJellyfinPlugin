@@ -84,7 +84,12 @@ public class CoaxIndexBuilder
 
         if (includeItems)
         {
-            response.Items = shaped.Select(BuildItemDto).ToList();
+            // Episodes inherit genres from their series, but the items returned by
+            // GetItemList are shallow/detached — touching ep.Series would either lazy-load
+            // (a silent per-episode DB roundtrip) or come back null. Resolve every distinct
+            // parent series exactly once up front, then project from that cache.
+            var seriesGenres = BuildSeriesGenreCache(shaped);
+            response.Items = shaped.Select(i => BuildItemDto(i, seriesGenres)).ToList();
         }
 
         if (includePeople)
@@ -312,7 +317,44 @@ public class CoaxIndexBuilder
 
     // ---- Item DTOs ---------------------------------------------------------------------
 
-    private static ItemDto BuildItemDto(BaseItem item)
+    /// <summary>
+    /// Resolves the genres of every distinct parent series referenced by the shaped episodes,
+    /// using a single <see cref="ILibraryManager.GetItemById(Guid)"/> hit per unique series id.
+    /// Only episodes that carry no genres of their own trigger a lookup, and each series is
+    /// fetched at most once. Movies and self-genred episodes never touch the library manager.
+    /// </summary>
+    private Dictionary<Guid, IReadOnlyList<string>> BuildSeriesGenreCache(List<BaseItem> items)
+    {
+        var cache = new Dictionary<Guid, IReadOnlyList<string>>();
+
+        foreach (var item in items)
+        {
+            if (item is not Episode ep
+                || ep.SeriesId == Guid.Empty
+                || (ep.Genres is { Length: > 0 }))
+            {
+                // Movie, series-less episode, or an episode that already has its own genres.
+                continue;
+            }
+
+            if (cache.ContainsKey(ep.SeriesId))
+            {
+                continue;
+            }
+
+            // Hydrated lookup against the in-memory library cache — not the detached
+            // ep.Series navigation. Store a sentinel (empty array) even on miss so a series
+            // with no genres isn't re-fetched for each of its episodes.
+            var seriesGenres = _libraryManager.GetItemById(ep.SeriesId)?.Genres;
+            cache[ep.SeriesId] = seriesGenres is { Length: > 0 }
+                ? seriesGenres
+                : Array.Empty<string>();
+        }
+
+        return cache;
+    }
+
+    private static ItemDto BuildItemDto(BaseItem item, IReadOnlyDictionary<Guid, IReadOnlyList<string>> seriesGenres)
     {
         var dto = new ItemDto
         {
@@ -337,13 +379,13 @@ public class CoaxIndexBuilder
             dto.IndexNumber = ep.IndexNumber;
 
             // Episodes inherit genres from the series; the episode DTO often carries none.
-            if (dto.Genres.Count == 0 && ep.SeriesId != Guid.Empty)
+            // Pull them from the pre-resolved cache rather than the un-loaded navigation.
+            if (dto.Genres.Count == 0
+                && ep.SeriesId != Guid.Empty
+                && seriesGenres.TryGetValue(ep.SeriesId, out var inherited)
+                && inherited.Count > 0)
             {
-                var series = ep.Series;
-                if (series?.Genres is { Length: > 0 } seriesGenres)
-                {
-                    dto.Genres = seriesGenres;
-                }
+                dto.Genres = inherited;
             }
         }
         else
