@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "1.0.1.0",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/OutToLunchPro/CoaxJellyfinPlugin/releases/download/v1.0.1.0/Coax_1.0.1.0.zip",
+        "checksum": "60f87d42cb32f33cc3ff8246f69fec18",
+        "changelog": "Per-series genre cache, maxItems clamp, caller-scoped index with admin checks.",
+        "timestamp": "2026-05-31T01:37:12Z"
+      },
+      {
         "version": "1.0.0.0",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/OutToLunchPro/CoaxJellyfinPlugin/releases/download/v1.0.0.0/Coax_1.0.0.0.zip",
