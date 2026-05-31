@@ -26,7 +26,7 @@ public class CoaxIndexBuilder
     private readonly IUserManager _userManager;
     private readonly ILocalizationManager _localization;
     private readonly IDbContextFactory<JellyfinDbContext> _dbFactory;
-    private readonly ILogger _logger;
+    private readonly ILogger<CoaxIndexBuilder> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CoaxIndexBuilder"/> class.
@@ -36,7 +36,7 @@ public class CoaxIndexBuilder
         IUserManager userManager,
         ILocalizationManager localization,
         IDbContextFactory<JellyfinDbContext> dbFactory,
-        ILogger logger)
+        ILogger<CoaxIndexBuilder> logger)
     {
         _libraryManager = libraryManager;
         _userManager = userManager;
@@ -46,19 +46,27 @@ public class CoaxIndexBuilder
     }
 
     /// <summary>
-    /// Builds the index for the given request.
+    /// Builds the index for the given request, scoped to the authenticated caller.
     /// </summary>
     /// <param name="request">The validated request.</param>
+    /// <param name="accessUser">
+    /// The authenticated caller. Every library query runs as this user so Jellyfin enforces
+    /// their access + parental/tag rules — even when no watch filter is applied. The
+    /// controller is responsible for authorizing any other user named in <c>filters.userId</c>
+    /// before calling in.
+    /// </param>
     /// <returns>The computed response.</returns>
-    public IndexResponse Build(IndexRequest request)
+    public IndexResponse Build(IndexRequest request, User accessUser)
     {
+        ArgumentNullException.ThrowIfNull(accessUser);
+
         var filters = request.Filters ?? new IndexFilters();
         var shaping = request.Shaping ?? new IndexShaping();
 
         var includeItems = request.Include.Contains("items", StringComparer.OrdinalIgnoreCase);
         var includePeople = request.Include.Contains("people", StringComparer.OrdinalIgnoreCase);
 
-        var (isPlayed, user) = ResolveWatched(filters);
+        var (isPlayed, user) = ResolveWatched(filters, accessUser);
         var ratingCap = ResolveRatingCap(filters.MaxOfficialRating);
         var itemKinds = ResolveItemKinds(request.ItemTypes);
 
@@ -89,12 +97,15 @@ public class CoaxIndexBuilder
 
     // ---- Filters / resolution ----------------------------------------------------------
 
-    private (bool? IsPlayed, User? User) ResolveWatched(IndexFilters filters)
+    private (bool? IsPlayed, User? User) ResolveWatched(IndexFilters filters, User accessUser)
     {
         var watched = (filters.Watched ?? "all").Trim().ToLowerInvariant();
         if (watched == "all")
         {
-            return (null, null);
+            // No watch-state filter, but still run the query AS the caller so library
+            // access and parental/tag rules are enforced. A null user here would return
+            // the entire server unrestricted — the bypass this guards against.
+            return (null, accessUser);
         }
 
         if (string.IsNullOrWhiteSpace(filters.UserId))
