@@ -1,0 +1,88 @@
+name: release
+
+# Push a tag like `v1.0.1.0` (or run this workflow manually with a version) and CI will:
+#   1. sync meta.json + the csproj to that version
+#   2. test, build, and package dist/Coax_<version>.zip
+#   3. create/refresh the GitHub release and upload the zip as an asset
+#   4. regenerate the root manifest.json and commit it back to main
+# The git tag is the single source of truth for the version — no hand-editing required.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, e.g. 1.0.1.0'
+        required: true
+
+permissions:
+  contents: write   # create releases, upload assets, push the manifest commit
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # Check out main (not the detached tag) so we can commit the refreshed manifest
+      # back onto the branch. fetch-depth: 0 also brings the tag annotation for the changelog.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Resolve version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME#v}"   # strip the leading "v" from the tag
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Sync version into meta.json + csproj
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          tmp="$(mktemp)"
+          jq --arg v "$V" '.version = $v' Jellyfin.Plugin.Coax/meta.json > "$tmp"
+          mv "$tmp" Jellyfin.Plugin.Coax/meta.json
+          sed -i -E "s#<(AssemblyVersion|FileVersion|Version)>[^<]*</\1>#<\1>$V</\1>#g" \
+            Jellyfin.Plugin.Coax/Jellyfin.Plugin.Coax.csproj
+
+      - name: Test
+        run: dotnet test Jellyfin.Plugin.Coax.Tests/Jellyfin.Plugin.Coax.Tests.csproj -c Release
+
+      - name: Build + package
+        env:
+          COAX_SOURCE_BASE_URL: https://github.com/${{ github.repository }}/releases/download/v${{ steps.v.outputs.version }}
+        run: ./build.sh
+
+      - name: Update manifest.json
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          ABI="$(jq -r .targetAbi Jellyfin.Plugin.Coax/meta.json)"
+          # Use the annotated tag's subject line as the changelog (empty for manual runs).
+          CHANGELOG="$(git tag -l --format='%(contents:subject)' "v$V")"
+          scripts/update-manifest.sh "$V" "$ABI" \
+            "https://github.com/${{ github.repository }}/releases/download/v$V/Coax_$V.zip" \
+            "dist/Coax_$V.zip" "$CHANGELOG"
+
+      - name: Create release + upload zip
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.v.outputs.version }}
+          name: v${{ steps.v.outputs.version }}
+          files: dist/Coax_${{ steps.v.outputs.version }}.zip
+          generate_release_notes: true
+
+      - name: Commit refreshed manifest + version bump
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          git config user.name  "Coax"
+          git config user.email "coax@out-to-lunch.pro"
+          git add manifest.json Jellyfin.Plugin.Coax/meta.json Jellyfin.Plugin.Coax/Jellyfin.Plugin.Coax.csproj
+          git diff --cached --quiet || git commit -m "Release v$V: refresh manifest and bump version. [skip ci]"
+          git push origin HEAD:main

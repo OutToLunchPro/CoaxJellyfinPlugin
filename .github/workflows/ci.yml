@@ -1,0 +1,21 @@
+name: ci
+
+# Build + test on every push to main and every PR, so a release tag never
+# fails on something a normal commit would have caught.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Test
+        run: dotnet test Jellyfin.Plugin.Coax.Tests/Jellyfin.Plugin.Coax.Tests.csproj -c Release

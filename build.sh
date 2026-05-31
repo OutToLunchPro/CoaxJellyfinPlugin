@@ -3,10 +3,17 @@
 # drop-in bundle under dist/Coax_1.0.0.0/. Run from anywhere: ./build.sh
 set -euo pipefail
 
-# .NET 10 SDK (installed via `brew install dotnet`) — can target net9.0.
-# It's shadowed on PATH by dotnet@8, so we invoke it by full path.
-DOTNET_BIN="/opt/homebrew/opt/dotnet/bin/dotnet"
-export DOTNET_ROOT="/opt/homebrew/opt/dotnet/libexec"
+# Prefer an explicit DOTNET_BIN, then Homebrew's .NET (local dev on macOS, where the
+# Homebrew SDK is shadowed on PATH by dotnet@8), then whatever `dotnet` is on PATH (CI).
+DOTNET_BIN="${DOTNET_BIN:-}"
+if [ -z "$DOTNET_BIN" ]; then
+  if [ -x "/opt/homebrew/opt/dotnet/bin/dotnet" ]; then
+    DOTNET_BIN="/opt/homebrew/opt/dotnet/bin/dotnet"
+    export DOTNET_ROOT="/opt/homebrew/opt/dotnet/libexec"
+  else
+    DOTNET_BIN="dotnet"
+  fi
+fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ="$ROOT/Jellyfin.Plugin.Coax"
@@ -33,7 +40,12 @@ cp "$META" "$DIST/"
 # so the dll/meta.json must sit at the zip root (no enclosing folder).
 rm -f "$ZIP"
 ( cd "$DIST" && zip -q -r -X "$ZIP" . )
-CHECKSUM="$(md5 -q "$ZIP")"
+# macOS ships `md5 -q`; Linux/CI ships `md5sum`.
+if command -v md5 >/dev/null 2>&1; then
+  CHECKSUM="$(md5 -q "$ZIP")"
+else
+  CHECKSUM="$(md5sum "$ZIP" | cut -d' ' -f1)"
+fi
 
 # manifest.json: a single-plugin repository so the dashboard resolves the plugin
 # by GUID (kills the "error getting plugin details from the repository" message)
