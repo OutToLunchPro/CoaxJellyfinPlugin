@@ -291,16 +291,23 @@ public class CoaxIndexBuilder
         return kept;
     }
 
-    private static List<BaseItem> ApplyMaxItems(List<BaseItem> items, int? maxItems, ref bool truncated)
+    internal static List<BaseItem> ApplyMaxItems(List<BaseItem> items, int? maxItems, ref bool truncated)
     {
-        if (maxItems is null || maxItems.Value <= 0 || items.Count <= maxItems.Value)
+        // The ceiling is an unconditional backstop: a request with no cap (null/<=0) or a cap
+        // above the ceiling is still clamped, so a single call can never be coerced into
+        // materializing an unbounded result set.
+        var effectiveCap = maxItems is > 0
+            ? Math.Min(maxItems.Value, CoaxContract.DefaultMaxItemsCeiling)
+            : CoaxContract.DefaultMaxItemsCeiling;
+
+        if (items.Count <= effectiveCap)
         {
             return items;
         }
 
         truncated = true;
         // Random subset — order is irrelevant to the client (it re-shuffles), so a shuffle suffices.
-        return items.OrderBy(_ => Random.Shared.Next()).Take(maxItems.Value).ToList();
+        return items.OrderBy(_ => Random.Shared.Next()).Take(effectiveCap).ToList();
     }
 
     // ---- Item DTOs ---------------------------------------------------------------------

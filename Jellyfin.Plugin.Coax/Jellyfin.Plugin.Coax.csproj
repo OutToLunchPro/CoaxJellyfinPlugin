@@ -17,6 +17,11 @@
     <PackageReference Include="Jellyfin.Controller" Version="10.11.8" />
   </ItemGroup>
 
+  <!-- Expose internal helpers (e.g. CoaxIndexBuilder.ApplyMaxItems) to the unit test assembly. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jellyfin.Plugin.Coax.Tests" />
+  </ItemGroup>
+
   <!-- Controllers (ControllerBase / [ApiController] / [Authorize]) need the ASP.NET Core shared framework. -->
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
