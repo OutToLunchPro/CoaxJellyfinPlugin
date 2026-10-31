@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build the Coax plugin against the Jellyfin 10.11 (net9.0) assemblies and refresh the
-# drop-in bundle under dist/Coax_1.0.0.0/. Run from anywhere: ./build.sh
+# Build the Coax plugin against the Jellyfin 12 (net10.0) assemblies and refresh the
+# drop-in bundle under dist/Coax_<version>/. Run from anywhere: ./build.sh
 set -euo pipefail
 
 # Prefer an explicit DOTNET_BIN, then Homebrew's .NET (local dev on macOS, where the
@@ -17,7 +17,10 @@ fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ="$ROOT/Jellyfin.Plugin.Coax"
-OUT="$PROJ/bin/Release/net9.0"
+# The bin/ subfolder follows the csproj's TargetFramework, so a framework bump can't leave
+# the bundle copying a stale dll out of the previous framework's folder.
+TFM="$(sed -n 's:.*<TargetFramework>\(.*\)</TargetFramework>.*:\1:p' "$PROJ/Jellyfin.Plugin.Coax.csproj")"
+OUT="$PROJ/bin/Release/$TFM"
 META="$PROJ/meta.json"
 
 VERSION="$(jq -r .version "$META")"

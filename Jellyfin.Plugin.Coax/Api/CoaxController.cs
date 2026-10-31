@@ -28,7 +28,7 @@ public class CoaxController : ControllerBase
     /// authenticated user id as an "N"-formatted GUID. The constant itself
     /// (<c>Jellyfin.Api.Constants.InternalClaimTypes.UserId</c>) lives in the Jellyfin.Api
     /// assembly, which plugins don't reference, so we match the literal. Stable across
-    /// Jellyfin 10.8–10.11 — worth re-checking on a major server bump.
+    /// Jellyfin 10.8–12.4 — worth re-checking on a major server bump.
     /// </summary>
     private const string UserIdClaim = "Jellyfin-UserId";
 

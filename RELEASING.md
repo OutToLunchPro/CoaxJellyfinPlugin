@@ -28,6 +28,11 @@ Use the four-part `MAJOR.MINOR.PATCH.BUILD` form Jellyfin expects (e.g. `1.0.1.0
 Jellyfin offers an in-app update only when the manifest advertises a **higher** version
 than the one installed, so always bump.
 
+A Jellyfin major bump (e.g. 10.11 → 12) means a new `targetAbi` in `meta.json` (moved together
+with the `Jellyfin.Controller` package and `TargetFramework`) and a version bump here. Older
+servers keep the previous build: Jellyfin only offers versions whose `targetAbi` is at or
+below its own.
+
 ## Manual run
 
 You can also trigger from the Actions tab → **release** → **Run workflow**, entering the
