@@ -53,13 +53,12 @@ public class CoaxIndexBuilder
     /// The authenticated caller. Every library query runs as this user so Jellyfin enforces
     /// their access + parental/tag rules — even when no watch filter is applied. The
     /// controller is responsible for authorizing any other user named in <c>filters.userId</c>
-    /// before calling in.
+    /// before calling in. Null only for a server API key, which the controller lets read as an
+    /// administrator: the queries then run with no user across the requested libraries.
     /// </param>
     /// <returns>The computed response.</returns>
-    public IndexResponse Build(IndexRequest request, User accessUser)
+    public IndexResponse Build(IndexRequest request, User? accessUser)
     {
-        ArgumentNullException.ThrowIfNull(accessUser);
-
         var filters = request.Filters ?? new IndexFilters();
         var shaping = request.Shaping ?? new IndexShaping();
 
@@ -102,14 +101,14 @@ public class CoaxIndexBuilder
 
     // ---- Filters / resolution ----------------------------------------------------------
 
-    private (bool? IsPlayed, User? User) ResolveWatched(IndexFilters filters, User accessUser)
+    private (bool? IsPlayed, User? User) ResolveWatched(IndexFilters filters, User? accessUser)
     {
         var watched = (filters.Watched ?? "all").Trim().ToLowerInvariant();
         if (watched == "all")
         {
             // No watch-state filter, but still run the query AS the caller so library
-            // access and parental/tag rules are enforced. A null user here would return
-            // the entire server unrestricted — the bypass this guards against.
+            // access and parental/tag rules are enforced. A null user here reads the
+            // requested libraries unrestricted, so only a server API key is given one.
             return (null, accessUser);
         }
 
