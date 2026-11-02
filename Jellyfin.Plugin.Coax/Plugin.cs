@@ -45,7 +45,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     /// <inheritdoc />
     public override string Description =>
-        "Stateless person→items inverse and collection-membership index for Coax Actor/Director channels.";
+        "Stateless person→items inverse index for Coax Actor/Director channels (movies and TV).";
 
     /// <inheritdoc />
     public IEnumerable<PluginPageInfo> GetPages()
