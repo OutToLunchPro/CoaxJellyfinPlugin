@@ -28,9 +28,16 @@ public class CoaxController : ControllerBase
     /// authenticated user id as an "N"-formatted GUID. The constant itself
     /// (<c>Jellyfin.Api.Constants.InternalClaimTypes.UserId</c>) lives in the Jellyfin.Api
     /// assembly, which plugins don't reference, so we match the literal. Stable across
-    /// Jellyfin 10.8–10.11 — worth re-checking on a major server bump.
+    /// Jellyfin 10.8–12.4 — worth re-checking on a major server bump.
     /// </summary>
     private const string UserIdClaim = "Jellyfin-UserId";
+
+    /// <summary>
+    /// Claim the same pipeline stamps <c>True</c> when the token is a server API key
+    /// (<c>Jellyfin.Api.Constants.InternalClaimTypes.IsApiKey</c>). A key has no user of its
+    /// own: its <see cref="UserIdClaim"/> is the empty GUID.
+    /// </summary>
+    private const string IsApiKeyClaim = "Jellyfin-IsApiKey";
 
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
@@ -73,7 +80,8 @@ public class CoaxController : ControllerBase
     /// Builds the person→items inverse, collection memberships, and item metadata for the
     /// requested libraries. Stateless — recomputed from the library on every call. Every
     /// access is scoped to the authenticated caller; a non-admin may only read their own
-    /// watch state and only from libraries they can see.
+    /// watch state and only from libraries they can see. A server API key reads as an
+    /// administrator with no user of its own.
     /// </summary>
     /// <param name="request">The index request.</param>
     /// <response code="200">Index built.</response>
@@ -105,21 +113,26 @@ public class CoaxController : ControllerBase
             return BadRequest("At least one libraryId is required.");
         }
 
-        // --- AuthN: map the validated session principal to a real user. Fail closed. ---
-        var caller = ResolveCaller();
-        if (caller is null)
+        // --- AuthN: map the session principal to a real user or a server API key. Fail closed. ---
+        var caller = ResolveCaller(out var isApiKey);
+        if (caller is null && !isApiKey)
         {
-            // [Authorize] was satisfied but we couldn't bind the principal to a user.
+            // [Authorize] was satisfied but the principal is neither a user nor a server API key.
             _logger.LogWarning("Coax: authenticated request without a resolvable user; denied.");
             return Forbid();
         }
 
+        // Jellyfin treats a server API key as an administrator (it satisfies RequiresElevation).
         // HasPermission is an extension on IHasPermissions (Jellyfin.Data.UserEntityExtensions),
         // which the User entity implements.
-        var isAdmin = caller.HasPermission(PermissionKind.IsAdministrator);
+        var isAdmin = isApiKey || caller!.HasPermission(PermissionKind.IsAdministrator);
 
         // --- AuthZ #1: watch-history scope. A non-admin may only read their own history. ---
-        var scopeError = AuthorizeUserScope(request, caller, isAdmin);
+        // The index runs as the caller; a key has no user, so it runs as filters.userId if given.
+        var accessUser = caller;
+        var scopeError = isApiKey
+            ? ResolveApiKeyUser(request, out accessUser)
+            : AuthorizeUserScope(request, caller!, isAdmin);
         if (scopeError is not null)
         {
             return scopeError;
@@ -136,8 +149,9 @@ public class CoaxController : ControllerBase
         {
             // Pass the caller so the underlying query runs as that user: Jellyfin then
             // enforces their library access + parental/tag rules instead of an unrestricted
-            // (null-user) query that would leak across the whole server.
-            return _indexBuilder.Build(request, caller);
+            // (null-user) query that would leak across the whole server. Only a server API
+            // key without filters.userId runs with no user, as Jellyfin's own /Items does.
+            return _indexBuilder.Build(request, accessUser);
         }
         catch (ArgumentException ex)
         {
@@ -184,11 +198,35 @@ public class CoaxController : ControllerBase
     }
 
     /// <summary>
+    /// Picks the user a server API key's index runs as. A key has no user of its own, so the
+    /// query runs as <c>filters.userId</c> when one is given (their watch state and parental
+    /// rules) and with no user when not: the administrator's view Jellyfin gives a key.
+    /// </summary>
+    private ActionResult? ResolveApiKeyUser(IndexRequest request, out User? accessUser)
+    {
+        accessUser = null;
+        var userId = request.Filters?.UserId;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return null;
+        }
+
+        if (!Guid.TryParse(userId, out var id))
+        {
+            return BadRequest($"filters.userId is not a valid id: {userId}");
+        }
+
+        // GetUserById throws on the empty id, which names no user anyway.
+        accessUser = id == Guid.Empty ? null : _userManager.GetUserById(id);
+        return accessUser is null ? BadRequest($"No such user: {userId}") : null;
+    }
+
+    /// <summary>
     /// Enforces that every requested library exists and — for non-admins — is one the caller
     /// can actually see. Closes the "pass arbitrary libraryIds to scrape a restricted
     /// library" vector.
     /// </summary>
-    private ActionResult? AuthorizeLibraryScope(IndexRequest request, User caller, bool isAdmin)
+    private ActionResult? AuthorizeLibraryScope(IndexRequest request, User? caller, bool isAdmin)
     {
         foreach (var libraryId in request.LibraryIds)
         {
@@ -203,11 +241,11 @@ public class CoaxController : ControllerBase
                 return BadRequest($"No such library: {libraryId}");
             }
 
-            if (!isAdmin && !library.IsVisibleStandalone(caller))
+            if (!isAdmin && (caller is null || !library.IsVisibleStandalone(caller)))
             {
                 _logger.LogWarning(
                     "Coax: user {Caller} requested inaccessible library {Library}; denied.",
-                    caller.Id,
+                    caller?.Id,
                     libGuid);
                 return Forbid();
             }
@@ -218,13 +256,26 @@ public class CoaxController : ControllerBase
 
     /// <summary>
     /// Resolves the authenticated user from the request principal. Returns <c>null</c> when
-    /// the principal carries no resolvable user, so callers can fail closed.
+    /// the principal carries no resolvable user, so callers can fail closed. Never throws: an
+    /// empty, unparseable or unknown id is no user. <paramref name="isApiKey"/> marks a server
+    /// API key, which has no user: from the IsApiKey claim, else from the empty id Jellyfin
+    /// writes for a key.
     /// </summary>
-    private User? ResolveCaller()
+    private User? ResolveCaller(out bool isApiKey)
     {
         var raw = User.FindFirst(UserIdClaim)?.Value;
-        if (!string.IsNullOrEmpty(raw)
-            && Guid.TryParse(raw, out var id)
+        var hasId = Guid.TryParse(raw, out var id);
+        isApiKey = bool.TryParse(User.FindFirst(IsApiKeyClaim)?.Value, out var claimed)
+            ? claimed
+            : hasId && id == Guid.Empty;
+        if (isApiKey)
+        {
+            return null;
+        }
+
+        // GetUserById throws on the empty id, so only a real id is looked up.
+        if (hasId
+            && id != Guid.Empty
             && _userManager.GetUserById(id) is { } user)
         {
             return user;

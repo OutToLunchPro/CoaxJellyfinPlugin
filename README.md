@@ -39,16 +39,27 @@ Cast attaches at two levels and the actor inverse unions both: **series-level** 
 
 ## Build
 
-Targets **net9.0** against the Jellyfin 10.11 ABI (built with the .NET 9 or 10 SDK).
+Targets **net10.0** against the Jellyfin 12 ABI (`targetAbi` 12.0.0.0; built with the .NET 10 SDK).
 
 ```sh
 ./build.sh
 ```
 
-`build.sh` compiles in Release and refreshes the drop-in bundle at `dist/Coax_1.0.0.0/` (`Jellyfin.Plugin.Coax.dll` + `meta.json`). Drop that folder into the `plugins/` directory under your Jellyfin data directory and restart the server.
+`build.sh` compiles in Release and refreshes the drop-in bundle at `dist/Coax_<version>/` (`Jellyfin.Plugin.Coax.dll`, `meta.json` and `image.png`). Drop that folder into the `plugins/` directory under your Jellyfin data directory and restart the server.
 
 It also emits `dist/Coax_<version>.zip` and `dist/manifest.json` for installing via a
 repository instead of side-loading (see below).
+
+## Compatibility
+
+| Jellyfin server | Coax plugin | Framework | `targetAbi` |
+|---|---|---|---|
+| 10.11.x | 1.0.1.0 | net9.0 | 10.11.0.0 |
+| 12.x | 1.1.0.0 | net10.0 | 12.0.0.0 |
+
+Both builds are published from the same repository URL (below), and the dashboard offers the
+right one on its own: Jellyfin only lists versions whose `targetAbi` is at or below the server's
+version, so a 12.x server gets 1.1.0.0 and a 10.11 server stays on 1.0.1.0.
 
 ## Install from the GitHub repository (recommended)
 
@@ -68,6 +79,8 @@ or hosting anything yourself:
 
 This also clears the *"An error occurred while getting the plugin details from the
 repository"* message that side-loaded copies show, since the GUID now resolves to a known repo.
+
+The Coax logo is `image.png` at the repo root: the catalog card loads it from the manifest's `imageUrl`, and the installed plugin's page shows the copy inside the zip, which `meta.json` names as `imagePath`.
 
 ## Install via your own repository (optional)
 

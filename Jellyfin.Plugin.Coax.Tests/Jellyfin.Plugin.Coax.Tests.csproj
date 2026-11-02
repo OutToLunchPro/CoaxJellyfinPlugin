@@ -1,16 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <!-- Tests target net9.0 (matching the plugin), but only the .NET 10 runtime is installed
-         locally. Roll forward across the major version so `dotnet test` runs without needing
-         DOTNET_ROLL_FORWARD=Major on the command line. -->
-    <RollForward>Major</RollForward>
   </PropertyGroup>
 
   <ItemGroup>
