@@ -6,7 +6,7 @@
     "overview": "Exposes /coax/info and /coax/index so the Coax client can build Actor/Director channels for Jellyfin libraries.",
     "owner": "coax",
     "category": "General",
-    "imageUrl": "",
+    "imageUrl": "https://raw.githubusercontent.com/OutToLunchPro/CoaxJellyfinPlugin/main/image.png",
     "versions": [
       {
         "version": "1.0.1.0",

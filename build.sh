@@ -38,11 +38,26 @@ mkdir -p "$DIST"
 cp "$OUT/Jellyfin.Plugin.Coax.dll" "$DIST/"
 cp "$OUT/Jellyfin.Plugin.Coax.pdb" "$DIST/" 2>/dev/null || true
 cp "$META" "$DIST/"
+# The installed plugin's page in the dashboard shows the file meta.json's imagePath names.
+cp "$ROOT/image.png" "$DIST/"
 
 # Repository zip: Jellyfin extracts its contents straight into the plugin dir,
-# so the dll/meta.json must sit at the zip root (no enclosing folder).
+# so the dll, meta.json and image.png must sit at the zip root (no enclosing folder).
 rm -f "$ZIP"
 ( cd "$DIST" && zip -q -r -X "$ZIP" . )
+
+# Packaging guard: fail the build if the zip lacks the dll, meta.json, or the image that
+# meta.json's imagePath names, so the artwork can't silently drop out of a release.
+ENTRIES="$(unzip -Z1 "$ZIP")"
+require_entry() {
+  grep -qxF "$1" <<<"$ENTRIES" || { echo "error: $ZIP has no $1" >&2; exit 1; }
+}
+require_entry Jellyfin.Plugin.Coax.dll
+require_entry meta.json
+IMAGE_PATH="$(unzip -p "$ZIP" meta.json | jq -r '.imagePath // empty')"
+[ -n "$IMAGE_PATH" ] || { echo "error: meta.json in $ZIP has no imagePath" >&2; exit 1; }
+require_entry "$IMAGE_PATH"
+
 # macOS ships `md5 -q`; Linux/CI ships `md5sum`.
 if command -v md5 >/dev/null 2>&1; then
   CHECKSUM="$(md5 -q "$ZIP")"
@@ -53,6 +68,8 @@ fi
 # manifest.json: a single-plugin repository so the dashboard resolves the plugin
 # by GUID (kills the "error getting plugin details from the repository" message)
 # and offers in-app updates. Add this file's URL under Dashboard → Plugins → Repositories.
+# The catalog card's picture is the same imageUrl the committed root manifest.json publishes.
+IMAGE_URL="$(jq -r '.[0].imageUrl // ""' "$ROOT/manifest.json")"
 jq -n \
   --arg guid       "$(jq -r .guid "$META")" \
   --arg name       "$(jq -r .name "$META")" \
@@ -60,6 +77,7 @@ jq -n \
   --arg overview   "$(jq -r .overview "$META")" \
   --arg owner      "$(jq -r .owner "$META")" \
   --arg category   "$(jq -r .category "$META")" \
+  --arg image      "$IMAGE_URL" \
   --arg version    "$VERSION" \
   --arg abi        "$(jq -r .targetAbi "$META")" \
   --arg source     "$SOURCE_BASE_URL/Coax_$VERSION.zip" \
@@ -67,7 +85,7 @@ jq -n \
   --arg timestamp  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   '[{
      guid: $guid, name: $name, description: $desc, overview: $overview,
-     owner: $owner, category: $category, imageUrl: "",
+     owner: $owner, category: $category, imageUrl: $image,
      versions: [{
        version: $version, targetAbi: $abi, sourceUrl: $source,
        checksum: $checksum, changelog: "", timestamp: $timestamp
