@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/OutToLunchPro/CoaxJellyfinPlugin/main/image.png",
     "versions": [
       {
+        "version": "1.1.0.0",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/OutToLunchPro/CoaxJellyfinPlugin/releases/download/v1.1.0.0/Coax_1.1.0.0.zip",
+        "checksum": "7efff7d6b4088a6acb8103b890b376e3",
+        "changelog": "Built for Jellyfin 12; /coax/index now accepts server API keys, and the plugin shows the Coax logo.",
+        "timestamp": "2026-11-02T14:34:42Z"
+      },
+      {
         "version": "1.0.1.0",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/OutToLunchPro/CoaxJellyfinPlugin/releases/download/v1.0.1.0/Coax_1.0.1.0.zip",
