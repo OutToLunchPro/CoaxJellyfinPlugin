@@ -45,7 +45,7 @@ Targets **net10.0** against the Jellyfin 12 ABI (`targetAbi` 12.0.0.0; built wit
 ./build.sh
 ```
 
-`build.sh` compiles in Release and refreshes the drop-in bundle at `dist/Coax_<version>/` (`Jellyfin.Plugin.Coax.dll` + `meta.json`). Drop that folder into the `plugins/` directory under your Jellyfin data directory and restart the server.
+`build.sh` compiles in Release and refreshes the drop-in bundle at `dist/Coax_<version>/` (`Jellyfin.Plugin.Coax.dll`, `meta.json` and `image.png`). Drop that folder into the `plugins/` directory under your Jellyfin data directory and restart the server.
 
 It also emits `dist/Coax_<version>.zip` and `dist/manifest.json` for installing via a
 repository instead of side-loading (see below).
@@ -79,6 +79,8 @@ or hosting anything yourself:
 
 This also clears the *"An error occurred while getting the plugin details from the
 repository"* message that side-loaded copies show, since the GUID now resolves to a known repo.
+
+The Coax logo is `image.png` at the repo root: the catalog card loads it from the manifest's `imageUrl`, and the installed plugin's page shows the copy inside the zip, which `meta.json` names as `imagePath`.
 
 ## Install via your own repository (optional)
 
